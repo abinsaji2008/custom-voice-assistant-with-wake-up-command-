@@ -69,6 +69,10 @@ FirebaseAuth fbAuth;
 FirebaseConfig fbConfig;
 bool firebaseInitialized = false;
 
+uint32_t recordEndMs = 0;
+uint32_t sttEndMs = 0;
+uint32_t aiEndMs = 0;
+
 const char *device[][2] = {
   {"main light","l1"},
   {"second light","l2"},
@@ -488,82 +492,55 @@ void transcribe() {
 
   net.print(
     String(
-      "POST /openai/v1/audio/transcriptions HTTP/1.1\r\n"
+      "POST /openai/v1/audio/transcriptions HTTP/1.1\\r\\n"
       "Host: "
     ) +
     HOST +
-    "\r\nAuthorization: Bearer " +
+    "\\r\\nAuthorization: Bearer " +
     SEED_GROQ_KEY +
-    "\r\nUser-Agent: ESP32-S3\r\n"
+    "\\r\\nUser-Agent: ESP32-S3\\r\\n"
     "Content-Type: multipart/form-data; boundary=" BOUNDARY
-    "\r\nTransfer-Encoding: chunked\r\n"
-    "Connection: close\r\n\r\n"
+    "\\r\\nTransfer-Encoding: chunked\\r\\n"
+    "Connection: close\\r\\n\\r\\n"
   );
 
   const char *form =
-    "--" BOUNDARY "\r\n"
-    "Content-Disposition: form-data; name=\"model\"\r\n\r\n"
-    MODEL "\r\n"
+    "--" BOUNDARY "\\r\\n"
+    "Content-Disposition: form-data; name=\"model\"\\r\\n\\r\\n"
+    MODEL "\\r\\n"
+    "--" BOUNDARY "\\r\\n"
+    "Content-Disposition: form-data; name=\"language\"\\r\\n\\r\\n"
+    "en\\r\\n"
+    "--" BOUNDARY "\\r\\n"
+    "Content-Disposition: form-data; name=\"response_format\"\\r\\n\\r\\n"
+    "text\\r\\n"
+    "--" BOUNDARY "\\r\\n"
+    "Content-Disposition: form-data; name=\"file\"; filename=\"a.wav\"\\r\\n"
+    "Content-Type: audio/wav\\r\\n\\r\\n";
 
-    "--" BOUNDARY "\r\n"
-    "Content-Disposition: form-data; name=\"language\"\r\n\r\n"
-    "en\r\n"
-
-    "--" BOUNDARY "\r\n"
-    "Content-Disposition: form-data; name=\"response_format\"\r\n\r\n"
-    "text\r\n"
-
-    "--" BOUNDARY "\r\n"
-    "Content-Disposition: form-data; name=\"file\"; filename=\"a.wav\"\r\n"
-    "Content-Type: audio/wav\r\n\r\n";
-
-  sendChunk(
-    (uint8_t*)form,
-    strlen(form)
-  );
+  sendChunk((uint8_t*)form, strlen(form));
 
   uint8_t wav[44];
-
   wavHeader(wav);
-
-  sendChunk(
-    wav,
-    44
-  );
+  sendChunk(wav, 44);
 
   Serial.println("[REC] Speak now...");
+  Serial.println("[REC] 2s silence -> STOP");
 
   filterReset();
 
   uint8_t raw[1024];
-
   uint32_t start = millis();
   uint32_t lastVoice = start;
-
   bool speech = false;
 
-  while (
-    millis() - start <
-    MAXSEC * 1000UL
-  ) {
-
-    // BLUE BLINK = RECORDING
+  while (millis() - start < MAXSEC * 1000UL) {
     blinkRecordingLED();
 
-    size_t n =
-      mic.readBytes(
-        (char*)raw,
-        sizeof(raw)
-      );
+    size_t n = mic.readBytes((char*)raw, sizeof(raw));
+    if (!n) continue;
 
-    if (!n)
-      continue;
-
-    uint32_t peak =
-      filterAudio(
-        (int16_t*)raw,
-        n / 2
-      );
+    uint32_t peak = filterAudio((int16_t*)raw, n / 2);
 
     if (peak > THRESH) {
       speech = true;
@@ -573,91 +550,72 @@ void transcribe() {
     if (!sendChunk(raw, n))
       break;
 
-    // Wait for first speech
-    if (
-      !speech &&
-      millis() - start >= WAITVOICE
-    ) {
-      Serial.println(
-        "[REC] No speech"
-      );
+    if (!speech && millis() - start >= WAITVOICE) {
+      Serial.println("[REC] No speech");
       break;
     }
 
-    // 2 seconds continuous silence
-    if (
-      speech &&
-      millis() - lastVoice >= SILENCE
-    ) {
-      Serial.println(
-        "[REC] 2s silence -> STOP"
-      );
+    if (speech && millis() - lastVoice >= SILENCE) {
+      Serial.println("[REC] 2s silence -> STOP");
       break;
     }
   }
 
-  // Recording finished
-  ledOff();
+  recordEndMs = millis();
 
-  // RED = recording finished
+  Serial.println("[REC] Recording ended");
+  Serial.printf("[TIME] Record end timestamp: %lu ms\\n",
+                (unsigned long)recordEndMs);
+
+  ledOff();
   ledRed();
   delay(2000);
   ledOff();
 
-
-  // Finish multipart upload
   String end =
-    String("\r\n--") +
+    String("\\r\\n--") +
     BOUNDARY +
-    "--\r\n";
+    "--\\r\\n";
 
-  sendChunk(
-    (uint8_t*)end.c_str(),
-    end.length()
-  );
+  sendChunk((uint8_t*)end.c_str(), end.length());
+  net.write((uint8_t*)"0\\r\\n\\r\\n", 5);
 
-  net.write(
-    (uint8_t*)"0\r\n\r\n",
-    5
-  );
+  Serial.println("[GROQ] Waiting...");
 
+  String text = groqRead();
 
-  Serial.println(
-    "[GROQ] Waiting..."
-  );
+  sttEndMs = millis();
 
-  String text =
-    groqRead();
+  Serial.printf("[TIME] Record end -> STT result: %lu ms\\n",
+                (unsigned long)(sttEndMs - recordEndMs));
 
   net.stop();
-
   text.trim();
 
   Serial.println();
-  Serial.println(
-    "================================"
-  );
-
-  Serial.println(
-    "YOU SAID:"
-  );
-
+  Serial.println("================================");
+  Serial.println("YOU SAID:");
   Serial.println(text);
+  Serial.println("================================");
 
-  Serial.println(
-    "================================"
-  );
+  AIResult ai = groqReason(text);
 
-  // V5: send the transcript to a reasoning model for the final answer.
-  String answer = groqReason(text);
+  aiEndMs = millis();
 
-  if (answer.length()) {
-    Serial.println();
-    Serial.println("AI:");
-    Serial.println(answer);
+  Serial.printf("[TIME] STT -> AI result: %lu ms\\n",
+                (unsigned long)(aiEndMs - sttEndMs));
+
+  Serial.printf("[TIME] Record end -> AI result: %lu ms\\n",
+                (unsigned long)(aiEndMs - recordEndMs));
+
+  if (ai.toCall != "none" &&
+      ai.toCall != "call_name") {
+    applyDeviceAction(ai.toCall);
   }
-}
 
+  saveAIHistory(text, ai.answer, ai.toCall);
+  printAIResult(ai);
+}
 
 // ================= WAKE WORD =================
 
