@@ -279,12 +279,12 @@ Check `secrets.h` and make sure the API key is valid.
         └── 4.ino
 ```
 
-## V2 development
+## V5 development
 
-The next firmware generation is V2.0 and uses the proven final V1 behavior as its baseline. The V2 source and secrets template are in:
+The next firmware generation is V5.0 and uses the proven final V1 behavior as its baseline. The V2 source and secrets template are in:
 
-- `firmware/v2/esp32s3_voice_assistant_v2.ino`
-- `firmware/v2/secrets.example.h`
+- `firmware/v5/esp32s3_voice_assistant_v5.ino`
+- `firmware/v5/secrets.example.h`
 - `docs/V2_DEVELOPMENT.md`
 
-V2 development records the goal, problem, design choice, reason, expected result, actual test result, and next step for each major change.
+V5 development records the goal, problem, design choice, reason, expected result, actual test result, and next step for each major change.
