@@ -1,20 +1,20 @@
-# Version 2 Development Plan
+# Version 5 Development Plan
 
 ## Version rule
 
-The next new firmware generation is V2.
+The current next firmware generation is V5.
 
-Use `v2/` for the V2 firmware family and filenames that describe the feature or milestone.
+Use `v5/` for the V5 firmware family and filenames that describe the feature or milestone.
 
 Example:
 
     firmware/
     ├── final/
     │   └── esp32s3_groq_voice_assistant_final.ino
-    └── v2/
+    └── v5/
         └── esp32s3_voice_assistant_v2.ino
 
-## What to document for every V2 change
+## What to document for every V5 change
 
 ### 1. Goal
 What the new version is intended to add or improve.
@@ -37,11 +37,11 @@ Record the actual Serial Monitor output, timing, errors, and observed behavior.
 ### 7. Next change
 Describe what remains to be improved.
 
-## V2 development principle
+## V5 development principle
 
-V2 should be developed as an incremental improvement over the proven final V1 firmware.
+V5 should be developed as an incremental improvement over the proven final V1 firmware.
 
-Keep the following working foundation unless a V2 change explicitly requires replacing it:
+Keep the following working foundation unless a V5 change explicitly requires replacing it:
 
 - ESP32-S3-WROOM-1 N16R8
 - INMP441 on GPIO16/17/15
@@ -53,11 +53,11 @@ Keep the following working foundation unless a V2 change explicitly requires rep
 - current LED state indication
 - ESP-SR 16M partition with model at 0xC10000
 
-Each V2 change should have a clear reason and a measurable test.
+Each V5 change should have a clear reason and a measurable test.
 
-## V2 change log template
+## V5 change log template
 
-    V2.x
+    V5.x
     Goal:
     Problem:
     Change:
@@ -66,9 +66,9 @@ Each V2 change should have a clear reason and a measurable test.
     Actual result:
     Next:
 
-## Suggested V2 workflow
+## Suggested V5 workflow
 
-1. Copy the latest known-working firmware into a new V2 file.
+1. Copy the latest known-working firmware into a new V5 file.
 2. Change one major behavior at a time.
 3. Compile using the same ESP32-SR build configuration.
 4. Flash the known-good Hi ESP model when required.
