@@ -539,31 +539,31 @@ void transcribe() {
 
   net.print(
     String(
-      "POST /openai/v1/audio/transcriptions HTTP/1.1\\r\\n"
+      "POST /openai/v1/audio/transcriptions HTTP/1.1\r\n"
       "Host: "
     ) +
     HOST +
-    "\\r\\nAuthorization: Bearer " +
+    "\r\nAuthorization: Bearer " +
     SEED_GROQ_KEY +
-    "\\r\\nUser-Agent: ESP32-S3\\r\\n"
+    "\r\nUser-Agent: ESP32-S3\r\n"
     "Content-Type: multipart/form-data; boundary=" BOUNDARY
-    "\\r\\nTransfer-Encoding: chunked\\r\\n"
-    "Connection: close\\r\\n\\r\\n"
+    "\r\nTransfer-Encoding: chunked\r\n"
+    "Connection: close\r\n\r\n"
   );
 
   const char *form =
-    "--" BOUNDARY "\\r\\n"
-    "Content-Disposition: form-data; name=\"model\"\\r\\n\\r\\n"
-    MODEL "\\r\\n"
-    "--" BOUNDARY "\\r\\n"
-    "Content-Disposition: form-data; name=\"language\"\\r\\n\\r\\n"
-    "en\\r\\n"
-    "--" BOUNDARY "\\r\\n"
-    "Content-Disposition: form-data; name=\"response_format\"\\r\\n\\r\\n"
-    "text\\r\\n"
-    "--" BOUNDARY "\\r\\n"
-    "Content-Disposition: form-data; name=\"file\"; filename=\"a.wav\"\\r\\n"
-    "Content-Type: audio/wav\\r\\n\\r\\n";
+    "--" BOUNDARY "\r\n"
+    "Content-Disposition: form-data; name=\"model\"\r\n\r\n"
+    MODEL "\r\n"
+    "--" BOUNDARY "\r\n"
+    "Content-Disposition: form-data; name=\"language\"\r\n\r\n"
+    "en\r\n"
+    "--" BOUNDARY "\r\n"
+    "Content-Disposition: form-data; name=\"response_format\"\r\n\r\n"
+    "text\r\n"
+    "--" BOUNDARY "\r\n"
+    "Content-Disposition: form-data; name=\"file\"; filename=\"a.wav\"\r\n"
+    "Content-Type: audio/wav\r\n\r\n";
 
   sendChunk((uint8_t*)form, strlen(form));
 
@@ -611,7 +611,7 @@ void transcribe() {
   recordEndMs = millis();
 
   Serial.println("[REC] Recording ended");
-  Serial.printf("[TIME] Record end timestamp: %lu ms\\n",
+  Serial.printf("[TIME] Record end timestamp: %lu ms\n",
                 (unsigned long)recordEndMs);
 
   ledOff();
@@ -620,12 +620,12 @@ void transcribe() {
   ledOff();
 
   String end =
-    String("\\r\\n--") +
+    String("\r\n--") +
     BOUNDARY +
-    "--\\r\\n";
+    "--\r\n";
 
   sendChunk((uint8_t*)end.c_str(), end.length());
-  net.write((uint8_t*)"0\\r\\n\\r\\n", 5);
+  net.write((uint8_t*)"0\r\n\r\n", 5);
 
   Serial.println("[GROQ] Waiting...");
 
@@ -633,7 +633,7 @@ void transcribe() {
 
   sttEndMs = millis();
 
-  Serial.printf("[TIME] Record end -> STT result: %lu ms\\n",
+  Serial.printf("[TIME] Record end -> STT result: %lu ms\n",
                 (unsigned long)(sttEndMs - recordEndMs));
 
   net.stop();
@@ -671,10 +671,10 @@ void transcribe() {
 
   aiEndMs = millis();
 
-  Serial.printf("[TIME] STT -> AI result: %lu ms\\n",
+  Serial.printf("[TIME] STT -> AI result: %lu ms\n",
                 (unsigned long)(aiEndMs - sttEndMs));
 
-  Serial.printf("[TIME] Record end -> AI result: %lu ms\\n",
+  Serial.printf("[TIME] Record end -> AI result: %lu ms\n",
                 (unsigned long)(aiEndMs - recordEndMs));
 
   if (ai.toCall != "none" && validDeviceAction(ai.toCall))
