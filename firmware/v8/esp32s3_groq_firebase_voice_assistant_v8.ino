@@ -788,6 +788,8 @@ void setup() {
   }
 
 
+  timeInit();
+  firebaseInit();
   groqConnect();
 
 
