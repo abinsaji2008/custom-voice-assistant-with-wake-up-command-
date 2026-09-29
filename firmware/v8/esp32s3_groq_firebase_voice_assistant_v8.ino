@@ -21,7 +21,7 @@
 // transcript, reasons internally, and returns only the final answer.
 // ============================================================================
 
-#define ASSISTANT_VERSION "V8.0"
+#define ASSISTANT_VERSION "V8.1"
 #define DEVICE_PREFIX "/devices"
 #define HISTORY_PREFIX "/ai_history"
 
@@ -107,6 +107,59 @@ String peopleList() {
     s += people[i];
   }
   return s;
+}
+
+bool validDeviceAction(const String &a) {
+  for (int i=0;i<DEVICE_COUNT;i++) {
+    String id=device[i][1];
+    if (a==id+"on" || a==id+"off") return true;
+  }
+  return false;
+}
+
+String normalizeCall(String v) {
+  v.trim(); v.toLowerCase();
+  if (v.startsWith("call_")) v=v.substring(5);
+  if (v=="ama" || v=="mama") v="amma";
+  if (v=="papa") v="appa";
+  for (int i=0;i<PEOPLE_COUNT;i++) if (v==people[i]) return v;
+  return "";
+}
+
+String personFromText(String t) {
+  t.toLowerCase();
+  if (t.indexOf("amma")>=0 || t.indexOf("ama")>=0 || t.indexOf("mama")>=0) return "amma";
+  if (t.indexOf("appa")>=0 || t.indexOf("papa")>=0) return "appa";
+  for (int i=0;i<PEOPLE_COUNT;i++) if (t.indexOf(people[i])>=0) return people[i];
+  return "";
+}
+
+String resolveDeviceAction(String t) {
+  t.toLowerCase();
+  bool on=t.indexOf("turn on")>=0 || t.indexOf("switch on")>=0 ||
+          t.indexOf("enable")>=0 || t.indexOf("activate")>=0 ||
+          (t.indexOf("turn ")>=0 && t.endsWith(" on")) ||
+          (t.indexOf("switch ")>=0 && t.endsWith(" on"));
+  bool off=t.indexOf("turn off")>=0 || t.indexOf("switch off")>=0 ||
+           t.indexOf("disable")>=0 || t.indexOf("deactivate")>=0 ||
+           (t.indexOf("turn ")>=0 && t.endsWith(" off")) ||
+           (t.indexOf("switch ")>=0 && t.endsWith(" off"));
+  if (!on && !off) return "";
+  for (int i=0;i<DEVICE_COUNT;i++)
+    if (t.indexOf(device[i][0])>=0)
+      return String(device[i][1]) + (on ? "on" : "off");
+  return "";
+}
+
+String deviceActionAnswer(const String &a) {
+  for (int i=0;i<DEVICE_COUNT;i++) {
+    String id=device[i][1], n=device[i][0];
+    if (a==id+"on" || a==id+"off") {
+      n.setCharAt(0,toupper(n[0]));
+      return n + (a==id+"on" ? " is turning on." : " is turning off.");
+    }
+  }
+  return "";
 }
 
 void timeInit() {
@@ -392,8 +445,9 @@ AIResult groqReason(const String &question) {
     "Never confuse devices. "
     "For normal questions use to_call=\"none\". "
     "Allowed people: " + peopleList() + ". "
-    "For an allowed person's call use to_call=\"call_name\" and answer "
-    "\"Calling <person>.\" "
+    "For a call, to_call MUST be exactly the person's allowed name, "
+    "such as \"amma\" or \"appa\". Never use call_name or call_<name>. "
+    "For a call, answer must be \"Calling <person>.\" "
     "For an unknown person use to_call=\"none\". "
     "Never invent devices, people, or phone numbers. "
     "No markdown, code fences, or extra fields.";
@@ -455,17 +509,10 @@ AIResult groqReason(const String &question) {
   if (!r.answer.length())
     r.answer = "I could not understand the AI response.";
 
-  bool valid = r.toCall == "none" || r.toCall == "call_name";
-  if (!valid) {
-    for (int i=0;i<DEVICE_COUNT;i++) {
-      String id = device[i][1];
-      if (r.toCall == id+"on" || r.toCall == id+"off") {
-        valid = true;
-        break;
-      }
-    }
-  }
+  String person = normalizeCall(r.toCall);
+  if (person.length()) r.toCall = person;
 
+  bool valid = r.toCall == "none" || validDeviceAction(r.toCall);
   if (!valid) r.toCall = "none";
   return r;
 }
@@ -600,6 +647,28 @@ void transcribe() {
 
   AIResult ai = groqReason(text);
 
+  // Local device mapping is authoritative.
+  String localAction = resolveDeviceAction(text);
+  if (localAction.length()) ai.toCall = localAction;
+
+  // Resolve call_name or STT/model variants to the actual person.
+  if (ai.toCall == "call_name") {
+    String p = personFromText(text);
+    ai.toCall = p.length() ? p : "none";
+  }
+
+  if (ai.toCall != "none" && !validDeviceAction(ai.toCall)) {
+    String p = normalizeCall(ai.toCall);
+    ai.toCall = p.length() ? p : "none";
+  }
+
+  // Generate natural answers locally.
+  String deviceAnswer = deviceActionAnswer(ai.toCall);
+  if (deviceAnswer.length()) ai.answer = deviceAnswer;
+
+  if (ai.toCall != "none" && !validDeviceAction(ai.toCall))
+    ai.answer = "Calling " + ai.toCall + ".";
+
   aiEndMs = millis();
 
   Serial.printf("[TIME] STT -> AI result: %lu ms\\n",
@@ -608,10 +677,8 @@ void transcribe() {
   Serial.printf("[TIME] Record end -> AI result: %lu ms\\n",
                 (unsigned long)(aiEndMs - recordEndMs));
 
-  if (ai.toCall != "none" &&
-      ai.toCall != "call_name") {
+  if (ai.toCall != "none" && validDeviceAction(ai.toCall))
     applyDeviceAction(ai.toCall);
-  }
 
   saveAIHistory(text, ai.answer, ai.toCall);
   printAIResult(ai);
