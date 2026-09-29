@@ -288,3 +288,6 @@ The next firmware generation is V5.0 and uses the proven final V1 behavior as it
 - `docs/V2_DEVELOPMENT.md`
 
 V5 development records the goal, problem, design choice, reason, expected result, actual test result, and next step for each major change.
+
+### V8
+- `firmware/v8/esp32s3_groq_firebase_voice_assistant_v8.ino` — Groq STT + GPT-OSS reasoning + ArduinoJson + Firebase device state/history.
