@@ -1,0 +1,7 @@
+secrets.h
+*.bin
+*.elf
+*.map
+.vscode/
+build/
+.arduino/
