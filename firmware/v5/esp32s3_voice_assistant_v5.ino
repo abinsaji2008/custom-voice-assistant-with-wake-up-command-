@@ -3,8 +3,10 @@
 // WakeNet9 "Hi ESP" + Groq Whisper streaming
 //
 // DESIGN REASONING
-// Goal: establish V2 from the proven final V1 baseline without changing the
-// working hardware/audio protocol.
+// Goal: add an on-device-to-Groq reasoning stage after Whisper transcription,
+// while keeping the proven audio/wake pipeline stable.
+//
+// // working hardware/audio protocol.
 //
 // Kept stable:
 // - ESP32-S3-WROOM-1 N16R8
@@ -15,7 +17,8 @@
 // - 2-second silence stop
 // - LED OFF while waiting, BLUE blink while recording, RED for 2 seconds
 //
-// V2 rule: change one major behavior at a time and record the reason/result.
+// V5 reasoning: Whisper performs STT; GPT-OSS 20B on Groq interprets the
+// transcript, reasons internally, and returns only the final answer.
 // ============================================================================
 
 #define ASSISTANT_VERSION "V5.0"
@@ -42,6 +45,7 @@
 
 #define HOST "api.groq.com"
 #define MODEL "whisper-large-v3-turbo"
+#define LLM_MODEL "openai/gpt-oss-20b"
 #define BOUNDARY "----esp32"
 
 I2SClass mic;
@@ -260,6 +264,87 @@ String groqRead() {
 }
 
 
+// ================= GROQ REASONING =================
+
+String jsonEscape(const String &s) {
+  String o;
+  for (size_t i = 0; i < s.length(); i++) {
+    char c = s[i];
+    if (c == '\\') o += "\\\\";
+    else if (c == '"') o += "\\"";
+    else if (c == '\\n') o += "\\n";
+    else if (c == '\\r') o += "\\r";
+    else if (c == '\\t') o += "\\t";
+    else o += c;
+  }
+  return o;
+}
+
+String extractContent(const String &json) {
+  int p = json.indexOf("\"content\":\"");
+  if (p < 0) return "";
+
+  p += 11;
+  String out;
+
+  bool esc = false;
+  for (; p < (int)json.length(); p++) {
+    char c = json[p];
+
+    if (esc) {
+      if (c == 'n') out += '\\n';
+      else if (c == 'r') out += '\\r';
+      else if (c == 't') out += '\\t';
+      else out += c;
+      esc = false;
+    } else if (c == '\\\\') {
+      esc = true;
+    } else if (c == '"') {
+      break;
+    } else {
+      out += c;
+    }
+  }
+  return out;
+}
+
+String groqReason(const String &question) {
+  if (!groqConnect()) return "";
+
+  String body =
+    "{"
+    "\"model\":\"" LLM_MODEL "\","
+    "\"messages\":["
+      "{\"role\":\"system\",\"content\":"
+      "\"You are the AI assistant of an ESP32 voice assistant. "
+      "Understand the user's request, reason internally before answering, "
+      "and give a concise, useful final answer. Do not reveal private "
+      "chain-of-thought or hidden reasoning.\"},"
+      "{\"role\":\"user\",\"content\":\"" +
+      jsonEscape(question) +
+      "\"}"
+    "],"
+    "\"reasoning_effort\":\"low\","
+    "\"reasoning_format\":\"hidden\","
+    "\"temperature\":0.2,"
+    "\"max_completion_tokens\":256"
+    "}";
+
+  net.print(
+    String("POST /openai/v1/chat/completions HTTP/1.1\r\n"
+           "Host: ") + HOST +
+    "\r\nAuthorization: Bearer " + SEED_GROQ_KEY +
+    "\r\nContent-Type: application/json\r\n"
+    "Content-Length: " + String(body.length()) +
+    "\r\nConnection: close\r\n\r\n" +
+    body
+  );
+
+  String reply = groqRead();
+  net.stop();
+  return extractContent(reply);
+}
+
 // ================= TRANSCRIBE =================
 
 void transcribe() {
@@ -431,6 +516,15 @@ void transcribe() {
   Serial.println(
     "================================"
   );
+
+  // V5: send the transcript to a reasoning model for the final answer.
+  String answer = groqReason(text);
+
+  if (answer.length()) {
+    Serial.println();
+    Serial.println("AI:");
+    Serial.println(answer);
+  }
 }
 
 
