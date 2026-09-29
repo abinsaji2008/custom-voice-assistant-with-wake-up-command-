@@ -271,10 +271,10 @@ String jsonEscape(const String &s) {
   for (size_t i = 0; i < s.length(); i++) {
     char c = s[i];
     if (c == '\\') o += "\\\\";
-    else if (c == '"') o += "\\"";
-    else if (c == '\\n') o += "\\n";
-    else if (c == '\\r') o += "\\r";
-    else if (c == '\\t') o += "\\t";
+    else if (c == '"' ) o += "\\\"";
+    else if (c == '\n') o += "\\n";
+    else if (c == '\r') o += "\\r";
+    else if (c == '\t') o += "\\t";
     else o += c;
   }
   return o;
@@ -292,12 +292,12 @@ String extractContent(const String &json) {
     char c = json[p];
 
     if (esc) {
-      if (c == 'n') out += '\\n';
-      else if (c == 'r') out += '\\r';
-      else if (c == 't') out += '\\t';
+      if (c == 'n') out += '\n';
+      else if (c == 'r') out += '\r';
+      else if (c == 't') out += '\t';
       else out += c;
       esc = false;
-    } else if (c == '\\\\') {
+    } else if (c == '\\') {
       esc = true;
     } else if (c == '"') {
       break;
