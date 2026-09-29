@@ -68,7 +68,7 @@ Important addresses:
 
 Path:
 
-`firmware/v1-basic/1.ino`
+`firmware/v1-basic/01_basic_wake_test.ino`
 
 Initial ESP32-S3 / microphone / speech-to-text development version.
 
@@ -76,7 +76,7 @@ Initial ESP32-S3 / microphone / speech-to-text development version.
 
 Path:
 
-`firmware/v2-wakenet-groq/2.ino`
+`firmware/v2-wakenet-groq/02_hiesp_groq_streaming.ino`
 
 Adds:
 
@@ -88,7 +88,7 @@ Adds:
 
 Path:
 
-`firmware/v3-silence/3.ino`
+`firmware/v3-silence/03_silence_detection.ino`
 
 Adds automatic recording termination after **2 seconds of silence**.
 
@@ -96,7 +96,7 @@ Adds automatic recording termination after **2 seconds of silence**.
 
 Path:
 
-`firmware/v4-final/4.ino`
+`firmware/v4-final/04_final_voice_assistant.ino`
 
 Adds the final recording-state LED behavior:
 
@@ -220,6 +220,17 @@ Print "YOU SAID"
    ↓
 Wait for "HI ESP"
 ```
+
+### Demo secrets files
+
+Each firmware folder contains its own `secrets.example.h` so the sketch can be copied and configured independently:
+
+- `firmware/v1-basic/secrets.example.h`
+- `firmware/v2-wakenet-groq/secrets.example.h`
+- `firmware/v3-silence/secrets.example.h`
+- `firmware/v4-final/secrets.example.h`
+
+Copy the matching demo file to `secrets.h` and replace the placeholders. Never commit the real `secrets.h`.
 
 ## Troubleshooting
 
